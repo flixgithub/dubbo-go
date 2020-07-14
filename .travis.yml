@@ -9,12 +9,23 @@ go:
 env:
   - GO111MODULE=on
 
+before_install:
+  - sudo apt install curl gnupg
+  - curl https://bazel.build/bazel-release.pub.gpg | sudo apt-key add - echo "deb [arch=amd64] https://storage.googleapis.com/bazel-apt stable" | sudo tee /etc/apt/sources.list.d/bazel.list
+  - sudo apt update && sudo apt install bazel
+  - sudo apt update && sudo apt full-upgrade
+
 install: true
 
 script:
   - go fmt ./... && [[ -z `git status -s` ]]
   - chmod u+x before_ut.sh && ./before_ut.sh
-  - go mod vendor && go test ./... -coverprofile=coverage.txt -covermode=atomic
+  - go mod vendor
+  - bazel clean --expunge
+  - bazel run //:gazelle -- update-repos -from_file=go.mod
+  - bazel build cluster/... common/... config/... config_center/... filter/... metrics/... protocol/... registry/... remoting/...
+  - bazel test --test_output=errors //...
+  
 
 after_success:
   - bash <(curl -s https://codecov.io/bash)
